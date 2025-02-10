@@ -1,0 +1,90 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database for FastAPI Services
+  postgres:
+    image: postgres:latest
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ecommerce
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # MongoDB for Node.js Services
+  mongodb:
+    image: mongo
+    container_name: mongo_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  # Auth Service (FastAPI)
+  auth-service:
+    build: ./backend/fastapi-services/auth-service
+    container_name: auth_service
+    depends_on:
+      - postgres
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/ecommerce
+    volumes:
+      - ./backend/fastapi-services/auth-service:/app
+
+  # Order Service (FastAPI)
+  order-service:
+    build: ./backend/fastapi-services/order-service
+    container_name: order_service
+    depends_on:
+      - postgres
+    ports:
+      - "8002:8000"
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/ecommerce
+    volumes:
+      - ./backend/fastapi-services/order-service:/app
+
+  # Product Service (Node.js)
+  product-service:
+    build: ./backend/node-services/product-service
+    container_name: product_service
+    depends_on:
+      - mongodb
+    ports:
+      - "3001:3000"
+    environment:
+      MONGO_URI: mongodb://mongo_db:27017/products
+    volumes:
+      - ./backend/node-services/product-service:/app
+
+  # Notification Service (Node.js)
+  notification-service:
+    build: ./backend/node-services/notification-service
+    container_name: notification_service
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./backend/node-services/notification-service:/app
+
+  # API Gateway (NGINX)
+  api-gateway:
+    image: nginx
+    container_name: api_gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./infrastructure/api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - auth-service
+      - order-service
+      - product-service
+      - notification-service
+
+volumes:
+  postgres_data:
+  mongo_data:
